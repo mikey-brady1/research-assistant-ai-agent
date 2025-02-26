@@ -9,17 +9,20 @@ from llmproxy import generate
 
 app = Flask(__name__)
 
-# Load API Key & Endpoint from environment variables
-apiKey = os.getenv("API_KEY", "").strip()
-endPoint = os.getenv("ENDPOINT", "").strip()
+# Retrieve API Key & Endpoint from environment variables
+apiKey = os.environ.get("apiKey", "").strip()
+endPoint = os.environ.get("endPoint", "").strip().strip('"')  # Strip accidental quotes
+
+# Debugging Logs
+print(f"Loaded API Key: {apiKey}")  
+print(f"Loaded Endpoint: {endPoint}")  
+
+if not apiKey or not endPoint:
+    raise RuntimeError("API_KEY or ENDPOINT is missing! Ensure they are set correctly in Koyeb.")
 
 # Rocket.Chat Bot Credentials
 RC_TOKEN = "LSyyCDMk0-vey1SFnWGL976a5dwdcTVQugpB_pmojlO"
 RC_USER_ID = "JTzYdypXa5E6Qh4uE"
-
-# Debugging logs
-print(f"Loaded API Key: {apiKey}")
-print(f"Loaded Endpoint: {endPoint}")
 
 if not apiKey or not endPoint:
     raise RuntimeError("API_KEY or ENDPOINT is missing! Set them as environment variables.")
