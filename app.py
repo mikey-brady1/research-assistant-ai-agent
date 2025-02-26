@@ -93,36 +93,47 @@ def research_assistant_agent(user_id, query):
     # Retrieve past interactions
     chat_history = get_chat_history(user_id)
 
-    # If it's the first time the user interacts, greet them and guide them
+    # If it's the first message from the user, greet and guide them
     if not chat_history:
         store_chat_history(user_id, query, "New user session started.")
+        user_chat_history[user_id] = {"stage": "initial"}  # Track user progress
         return (
-            "👋 Hello! I'm your Research Assistant. I can help you with:\n"
+            "👋 Hello! I'm your Research Assistant. I can help with:\n"
             "📖 Detailed explanations of academic topics\n"
             "📝 Summaries of complex texts\n"
             "🔎 Finding credible sources online\n"
-            "What would you like to research today?"
+            "Just tell me what you need, and I'll assist!"
         )
 
-    # Handle common greetings
-    greetings = ["hello", "hi", "hey", "what's up", "how are you"]
-    if query.lower() in greetings:
-        return "👋 Hello! I'm here to assist with research. What topic are you interested in?"
+    # Retrieve user’s conversation stage
+    user_stage = user_chat_history[user_id].get("stage", "initial")
 
-    # Determine intent and route the query appropriately
-    if is_research_query(query):
+    # **Step 1: Identify User Intent Automatically**
+    intent = detect_intent(query)
+
+    if intent == "explanation":
+        user_chat_history[user_id]["stage"] = "explanation"
+        return "📖 Got it! What topic do you need a deep explanation about?"
+    elif intent == "summary":
+        user_chat_history[user_id]["stage"] = "summary"
+        return "📝 Sure! Please provide the text or document you want summarized."
+    elif intent == "websearch":
+        user_chat_history[user_id]["stage"] = "websearch"
+        return "🔎 What topic would you like me to find sources for?"
+    
+    # **Step 2: Route Follow-Up Inputs Based on Detected Stage**
+    if user_stage == "explanation":
         return research_agent(query, user_id)
-    elif "summarize" in query.lower():
+
+    if user_stage == "summary":
         return summarization_agent(query)
-    else:
-        return (
-            "🤔 It looks like you're asking about something general. I'm here to help with research.\n"
-            "Would you like help with:\n"
-            "1️⃣ A deep explanation of a topic\n"
-            "2️⃣ A summary of a document\n"
-            "3️⃣ Finding sources online?\n"
-            "Please reply with a topic, or type 1, 2, or 3."
-        )
+
+    if user_stage == "websearch":
+        return websearch(query)
+
+    # **Fallback Response**
+    return "🤖 I'm here to assist with research! Try asking about a topic, summarization, or finding sources."
+
 
 ### **Research Agent**
 def research_agent(query, user_id):
@@ -236,6 +247,30 @@ def get_chat_history(user_id):
     Returns the last few messages as context.
     """
     return user_chat_history.get(user_id, [])
+
+### **Intent Detection for Natural Input**
+def detect_intent(query):
+    """
+    Determines user intent based on input.
+    - Returns 'explanation', 'summary', or 'websearch'.
+    """
+    query_lower = query.lower()
+
+    # Keywords for different intents
+    explanation_keywords = ["explain", "describe", "how does", "what is", "overview", "deep dive"]
+    summary_keywords = ["summarize", "condense", "tl;dr", "short version"]
+    websearch_keywords = ["find sources", "look up", "research articles", "search online", "credible sources"]
+
+    # Intent classification
+    if any(keyword in query_lower for keyword in explanation_keywords):
+        return "explanation"
+    elif any(keyword in query_lower for keyword in summary_keywords):
+        return "summary"
+    elif any(keyword in query_lower for keyword in websearch_keywords):
+        return "websearch"
+    
+    return "unknown"  # If unclear, bot will prompt for clarification
+
 
 ### **Research Query Detection**
 def is_research_query(query):
