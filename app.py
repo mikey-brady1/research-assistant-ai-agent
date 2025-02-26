@@ -93,16 +93,36 @@ def research_assistant_agent(user_id, query):
     # Retrieve past interactions
     chat_history = get_chat_history(user_id)
 
+    # If it's the first time the user interacts, greet them and guide them
     if not chat_history:
         store_chat_history(user_id, query, "New user session started.")
+        return (
+            "👋 Hello! I'm your Research Assistant. I can help you with:\n"
+            "📖 Detailed explanations of academic topics\n"
+            "📝 Summaries of complex texts\n"
+            "🔎 Finding credible sources online\n"
+            "What would you like to research today?"
+        )
 
-    # Determine intent and route to appropriate function
+    # Handle common greetings
+    greetings = ["hello", "hi", "hey", "what's up", "how are you"]
+    if query.lower() in greetings:
+        return "👋 Hello! I'm here to assist with research. What topic are you interested in?"
+
+    # Determine intent and route the query appropriately
     if is_research_query(query):
         return research_agent(query, user_id)
     elif "summarize" in query.lower():
         return summarization_agent(query)
     else:
-        return "❌ This assistant only handles research-related topics. Please ask about academic or scientific subjects."
+        return (
+            "🤔 It looks like you're asking about something general. I'm here to help with research.\n"
+            "Would you like help with:\n"
+            "1️⃣ A deep explanation of a topic\n"
+            "2️⃣ A summary of a document\n"
+            "3️⃣ Finding sources online?\n"
+            "Please reply with a topic, or type 1, 2, or 3."
+        )
 
 ### **Research Agent**
 def research_agent(query, user_id):
