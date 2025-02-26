@@ -24,9 +24,6 @@ if not apiKey or not endPoint:
 RC_TOKEN = "LSyyCDMk0-vey1SFnWGL976a5dwdcTVQugpB_pmojlO"
 RC_USER_ID = "JTzYdypXa5E6Qh4uE"
 
-if not apiKey or not endPoint:
-    raise RuntimeError("API_KEY or ENDPOINT is missing! Set them as environment variables.")
-
 # User session storage for chat history
 user_chat_history = {}
 
@@ -105,34 +102,24 @@ def research_assistant_agent(user_id, query):
             "Just tell me what you need, and I'll assist!"
         )
 
-    # Retrieve user’s conversation stage
-    user_stage = user_chat_history[user_id].get("stage", "initial")
-
-    # **Step 1: Identify User Intent Automatically**
+    # Detect user intent
     intent = detect_intent(query)
 
     if intent == "explanation":
-        user_chat_history[user_id]["stage"] = "explanation"
-        return "📖 Got it! What topic do you need a deep explanation about?"
-    elif intent == "summary":
-        user_chat_history[user_id]["stage"] = "summary"
-        return "📝 Sure! Please provide the text or document you want summarized."
-    elif intent == "websearch":
-        user_chat_history[user_id]["stage"] = "websearch"
-        return "🔎 What topic would you like me to find sources for?"
-    
-    # **Step 2: Route Follow-Up Inputs Based on Detected Stage**
-    if user_stage == "explanation":
         return research_agent(query, user_id)
-
-    if user_stage == "summary":
+    elif intent == "summary":
         return summarization_agent(query)
-
-    if user_stage == "websearch":
+    elif intent == "websearch":
         return websearch(query)
-
-    # **Fallback Response**
-    return "🤖 I'm here to assist with research! Try asking about a topic, summarization, or finding sources."
+    
+    # If intent is unclear, ask for clarification
+    return (
+        "🤖 I couldn't determine what you're looking for. Are you asking for:\n"
+        "- A detailed explanation of a topic?\n"
+        "- A summary of a document or text?\n"
+        "- Credible sources and research articles?\n"
+        "Try rephrasing your request or specifying what you need!"
+    )
 
 
 ### **Research Agent**
@@ -145,25 +132,10 @@ def research_agent(query, user_id):
     """
     print(f"[DEBUG] Research Agent processing: {query}")
 
-    # Retrieve conversation history
-    chat_history = get_chat_history(user_id)
-    context_text = "\n".join([f"User: {entry['query']}\nBot: {entry['response']}" for entry in chat_history])
-
-    system_instruction = f"""
-    You are an AI research assistant. Provide well-structured, fact-based responses.
-    Use clear formatting:
-    - **Summary:** (Concise overview)
-    - **Key Details:** (Supporting details and insights)
-    - **References:** (External sources, if available)
-
-    Recent conversation history:
-    {context_text}
-    """
-
     # Generate response from LLM
     response = generate(
         model="4o-mini",
-        system=system_instruction,
+        system="You are an AI research assistant providing structured, fact-based responses.",
         query=query,
         temperature=0.7,
         lastk=0,
@@ -187,68 +159,7 @@ def research_agent(query, user_id):
 
     return final_response
 
-### **Summarization Agent**
-def summarization_agent(text):
-    print(f"[DEBUG] Summarization Agent processing: {text}")
-
-    system_instruction = """
-    You are an expert summarizer. Condense long academic text into a clear, structured summary.
-    Format:
-    - **Main Idea:** (Core topic in one sentence)
-    - **Key Points:** (Bullet points of essential information)
-    - **Conclusion:** (Final takeaways)
-    """
-
-    response = generate(
-        model="4o-mini",
-        system=system_instruction,
-        query=text,
-        temperature=0.7,
-        lastk=0,
-        session_id="research-agent-assistant",  
-        rag_usage=False
-    )
-
-    # Debugging
-    print(f"[DEBUG] Full API Response: {response}")
-
-    return response.get("response", "I couldn't generate a summary. Try providing more details.")
-
-### **Web Search**
-def websearch(query):
-    """
-    Performs a DuckDuckGo search and returns top 3 links.
-    """
-    print(f"[DEBUG] Performing web search for: {query}")
-    try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=3))
-            if not results:
-                return "No web sources found."
-            return "\n".join([f"{result['title']}: {result['href']}" for result in results])
-    except Exception as e:
-        print(f"[ERROR] Web search failed: {e}")
-        return "No web sources available."
-
-### **Chat History Management**
-def store_chat_history(user_id, query, response):
-    """
-    Stores the last few exchanges for each user.
-    Keeps conversation history short to prevent overload.
-    """
-    if user_id not in user_chat_history:
-        user_chat_history[user_id] = []
-    user_chat_history[user_id].append({"query": query, "response": response})
-    user_chat_history[user_id] = user_chat_history[user_id][-5:]  # Limit to last 5 messages
-
-def get_chat_history(user_id):
-    """
-    Retrieves stored chat history for a user.
-    Returns the last few messages as context.
-    """
-    return user_chat_history.get(user_id, [])
-
-### **Intent Detection for Natural Input**
+### **Intent Detection**
 def detect_intent(query):
     """
     Determines user intent based on input.
@@ -270,15 +181,6 @@ def detect_intent(query):
         return "websearch"
     
     return "unknown"  # If unclear, bot will prompt for clarification
-
-
-### **Research Query Detection**
-def is_research_query(query):
-    """
-    Determines if the query is academic or scientific in nature.
-    """
-    research_keywords = ["explain", "compare", "impact of", "history of", "how does", "what is", "why"]
-    return any(keyword in query.lower() for keyword in research_keywords)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
